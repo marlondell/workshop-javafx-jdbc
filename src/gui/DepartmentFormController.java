@@ -3,7 +3,9 @@ package gui;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.Set;
 
 import db.DbException;
 import gui.listeners.DataChangeListener;
@@ -18,31 +20,32 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import model.entities.Department;
+import model.exceptions.ValidationException;
 import model.services.DepartmentService;
 
-public class DepartmentFormController implements Initializable{
-	
+public class DepartmentFormController implements Initializable {
+
 	private Department entity;
-	
+
 	private DepartmentService service;
-	
+
 	private List<DataChangeListener> DataChangeListeners = new ArrayList<>();
-	
+
 	@FXML
 	private TextField txtId;
-	
+
 	@FXML
 	private TextField txtName;
-	
+
 	@FXML
 	private Label labelErrorName;
-	
+
 	@FXML
 	private Button btnSave;
-	
+
 	@FXML
 	private Button btnCancel;
-	
+
 	@FXML
 	public void onBtnSaveAction(ActionEvent event) {
 		if (entity == null) {
@@ -52,26 +55,41 @@ public class DepartmentFormController implements Initializable{
 			throw new IllegalStateException("Service was null");
 		}
 		try {
-			entity = getFormDAta();
+			entity = getFormData();
 			service.saveOrUpdate(entity);
 			notifyDataChangeListeners();
 			Utils.currentStage(event).close();
+			
+		} catch (ValidationException e) {
+			setErrorMessages(e.getErrors());
+			
 		} catch (DbException e) {
 			Alerts.showAlert("Error saving object", null, e.getMessage(), AlertType.ERROR);
 		}
 	}
-	
+
 	private void notifyDataChangeListeners() {
 		for (DataChangeListener listener : DataChangeListeners) {
 			listener.onDataChanged();
 		}
-		
+
 	}
 
-	private Department getFormDAta() {
+	private Department getFormData() {
 		Department obj = new Department();
+
+		ValidationException exception = new ValidationException("Validation Error");
+
 		obj.setId(Utils.tryParsetoInt(txtId.getText()));
+
+		if (txtName.getText() == null || txtName.getText().trim().equals("")) {
+			exception.addError("name", "Field can't be empty");
+		}
 		obj.setName(txtName.getText());
+
+		if (exception.getErrors().size() > 0) {
+			throw exception;
+		}
 		return obj;
 	}
 
@@ -79,34 +97,35 @@ public class DepartmentFormController implements Initializable{
 	public void onBtnCancelAction(ActionEvent event) {
 		Utils.currentStage(event).close();
 	}
-	
+
 	public void setDepartment(Department entity) {
 		this.entity = entity;
 	}
-	
+
 	public void setDepartmentService(DepartmentService service) {
 		this.service = service;
 	}
-	
-	public void subscribeDataChangeListener (DataChangeListener listener) {
+
+	public void subscribeDataChangeListener(DataChangeListener listener) {
 		DataChangeListeners.add(listener);
 	}
-	
+
 	@Override
 	public void initialize(URL url, ResourceBundle rb) {
 		initializeNodes();
 	}
-	
-	//Parameters to control the Fields. FIeld ID just Integer and name max 30 char
+
+	// Parameters to control the Fields. FIeld ID just Integer and name max 30 char
 	private void initializeNodes() {
 		Constraints.setTextFieldInteger(txtId);
 		Constraints.setTextFieldMaxLength(txtName, 30);
 	}
-	
-	//We need to populate the object Department (entity) in the text box from form
-	//in the field ID, we need to convert to String because the form just works with 
-	//strings
-	
+
+	// We need to populate the object Department (entity) in the text box from form
+	// in the field ID, we need to convert to String because the form just works
+	// with
+	// strings
+
 	public void updateFormData() {
 		if (entity == null) {
 			throw new IllegalStateException("Entity was Null");
@@ -114,6 +133,13 @@ public class DepartmentFormController implements Initializable{
 		txtId.setText(String.valueOf(entity.getId()));
 		txtName.setText(entity.getName());
 	}
-	
+
+	private void setErrorMessages(Map<String, String> errors) {
+		Set<String> fields = errors.keySet();
+
+		if (fields.contains("name")) {
+			labelErrorName.setText(errors.get("name"));
+		}
+	}
 
 }
