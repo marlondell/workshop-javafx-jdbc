@@ -9,6 +9,7 @@ import application.Main;
 import gui.listeners.DataChangeListener;
 import gui.util.Alerts;
 import gui.util.Utils;
+import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
@@ -18,6 +19,7 @@ import javafx.fxml.Initializable;
 import javafx.scene.Scene;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.TableCell;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.cell.PropertyValueFactory;
@@ -27,46 +29,50 @@ import javafx.stage.Stage;
 import model.entities.Department;
 import model.services.DepartmentService;
 
-public class DepartmentListController implements Initializable, DataChangeListener{
-	
-	//Creating dependence to Department Service to have a reference of the other class
+public class DepartmentListController implements Initializable, DataChangeListener {
+
+	// Creating dependence to Department Service to have a reference of the other
+	// class
 	private DepartmentService service;
-	
-	//Creating a List to receive the departments and after, to consume it.
+
+	// Creating a List to receive the departments and after, to consume it.
 	private ObservableList<Department> obsList;
-	
-	
-	//Creating references to the elements of the Tableview
-	
+
+	// Creating references to the elements of the Tableview
+
 	@FXML
 	private TableView<Department> tableviewDepartment;
-	
+
 	@FXML
 	private TableColumn<Department, Integer> tableColumnID;
-	
+
 	@FXML
 	private TableColumn<Department, String> tableColumnName;
-	
+
+	@FXML
+	private TableColumn<Department, Department> tableColumnEDIT;
+
 	@FXML
 	private Button btNew;
-	
+
 	@FXML
 	public void onBtNewAction(ActionEvent event) {
 		Stage parentStage = Utils.currentStage(event);
 		Department obj = new Department();
 		createDialogForm(obj, "/gui/DepartmentForm.fxml", parentStage);
 	}
-	
-	//To have a weak coupling, we'll create a method instead of instantiate a object
-	//of the class DepartmentService. 
-	
+
+	// To have a weak coupling, we'll create a method instead of instantiate a
+	// object
+	// of the class DepartmentService.
+
 	public void setDepartmentService(DepartmentService service) {
 		this.service = service;
 	}
-	
-	
-	//We need to create the method initializeNodes to works correctly the columns "massete"
-	//to start the behavior of the columns
+
+	// We need to create the method initializeNodes to works correctly the columns
+	// "massete"
+	// to start the behavior of the columns
 	@Override
 	public void initialize(URL url, ResourceBundle rb) {
 		initializeNodes();
@@ -75,41 +81,47 @@ public class DepartmentListController implements Initializable, DataChangeListen
 	private void initializeNodes() {
 		tableColumnID.setCellValueFactory(new PropertyValueFactory<>("id"));
 		tableColumnName.setCellValueFactory(new PropertyValueFactory<>("name"));
-		
-		//The table is smaller than the Main screen. To fix it, we need get the current Scene
+
+		// The table is smaller than the Main screen. To fix it, we need get the current
+		// Scene
 		Stage stage = (Stage) Main.getMainScene().getWindow();
 		tableviewDepartment.prefHeightProperty().bind(stage.heightProperty());
 	}
-	
-	//Access the service, charge the Departments and discharge them in the ObservableList	
+
+	// Access the service, charge the Departments and discharge them in the
+	// ObservableList
 	public void updateTableView() {
-		//Protect the service. If the programmer forgets to do the dependence, the variable
-		//will be empty so, the exception will be throw to avoid this mistake.
+		// Protect the service. If the programmer forgets to do the dependence, the
+		// variable
+		// will be empty so, the exception will be throw to avoid this mistake.
 		if (service == null) {
 			throw new IllegalStateException("Service was null");
 		}
-		//This list will receive the departments of the class DepartmentServices through
-		//the variable service that is a type of DepartmentService.
+		// This list will receive the departments of the class DepartmentServices
+		// through
+		// the variable service that is a type of DepartmentService.
 		List<Department> list = service.findAll();
-		
-		//The list will be charged in the observableList. After, the content will be charged
-		//in the View object.
+
+		// The list will be charged in the observableList. After, the content will be
+		// charged
+		// in the View object.
 		obsList = FXCollections.observableArrayList(list);
 		tableviewDepartment.setItems(obsList);
+		initEditButtons();
 	}
-	
-	//Function to load the window to fill the data of the new department
+
+	// Function to load the window to fill the data of the new department
 	private void createDialogForm(Department obj, String absoluteName, Stage parentStage) {
 		try {
 			FXMLLoader loader = new FXMLLoader(getClass().getResource(absoluteName));
 			Pane pane = loader.load();
-			
+
 			DepartmentFormController controller = loader.getController();
 			controller.setDepartment(obj);
 			controller.setDepartmentService(new DepartmentService());
 			controller.subscribeDataChangeListener(this);
 			controller.updateFormData();
-			
+
 			Stage dialogStage = new Stage();
 			dialogStage.setTitle("Enter Department Data");
 			dialogStage.setScene(new Scene(pane));
@@ -117,8 +129,8 @@ public class DepartmentListController implements Initializable, DataChangeListen
 			dialogStage.initOwner(parentStage);
 			dialogStage.initModality(Modality.WINDOW_MODAL);
 			dialogStage.showAndWait();
-			
-		}catch (IOException e) {
+
+		} catch (IOException e) {
 			Alerts.showAlert("IO Exception", "Error loading view", e.getMessage(), AlertType.ERROR);
 		}
 	}
@@ -126,7 +138,26 @@ public class DepartmentListController implements Initializable, DataChangeListen
 	@Override
 	public void onDataChanged() {
 		updateTableView();
-		
+
+	}
+
+	private void initEditButtons() {
+		tableColumnEDIT.setCellValueFactory(param -> new ReadOnlyObjectWrapper<>(param.getValue()));
+		tableColumnEDIT.setCellFactory(param -> new TableCell<Department, Department>() {
+			private final Button button = new Button("edit");
+
+			@Override
+			protected void updateItem(Department obj, boolean empty) {
+				super.updateItem(obj, empty);
+				if (obj == null) {
+					setGraphic(null);
+					return;
+				}
+				setGraphic(button);
+				button.setOnAction(
+						event -> createDialogForm(obj, "/gui/DepartmentForm.fxml", Utils.currentStage(event)));
+			}
+		});
 	}
 
 }
